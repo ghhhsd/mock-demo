@@ -10,8 +10,6 @@ const LDR_X16_NEXT2: c_uchar = 0x58000050;
 const BR_X16: c_uchar = 0xD61F0200;
 
 
-// const LONG_JUMP_X16: c_uchar = (BR_X16 << 32 | LDR_X16_NEXT2);
-
 const B_JUM_LEN: usize = 4;
 const DIRECT_JUMP_LEN: usize = 16;
 
@@ -21,8 +19,9 @@ pub fn replace_instruction(origin_fun: *mut c_void, stub_fun: *mut c_void) {
     if B_JUM_LEN == inst_len {
         let offset = (origin_fun as c_ulong).wrapping_sub(stub_fun as c_ulong);
         offset >>= 2_i32;
+        let diff = offset & 0x3FFFFFF;
         unsafe {
-            origin_fun = 0x14000000 | (offset & 0x3FFFFFF);
+            origin_fun = 0x14000000 | diff;
         }
     } else {
         unsafe {
@@ -42,8 +41,8 @@ fn get_offset(origin_fun: *mut c_void, stub_fun: *mut c_void) -> usize {
 pub fn get_instruction_len(origin_fun: *mut c_void, stub_fun: *mut c_void) -> usize {
     let offset = get_offset(origin_fun, stub_fun);
 
-
-    if offset <= 128 * 1024 * 1024 {
+    // B imm with +- 128MB offset
+    if offset >> 26 == 5 {
         return B_JUM_LEN;
     }
 
