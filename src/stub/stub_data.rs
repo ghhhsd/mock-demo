@@ -16,6 +16,7 @@ pub enum StubError {
     NullPointer,
     SamePointer,
     RepeatedlyStub,
+    InvalidParameter,
     MProtectError(c_int),
 }
 

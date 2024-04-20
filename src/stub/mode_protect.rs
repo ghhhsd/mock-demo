@@ -7,8 +7,11 @@ const MPROTEXT_RWX: c_int = PROT_READ | PROT_WRITE | PROT_EXEC;
 
 /// Unix `mprotect`.
 #[cfg(unix)]
-unsafe fn _mprotect(ptr: *mut c_void, len: usize, prot: c_int) -> c_int {
+fn _mprotect(ptr: *mut c_void, len: usize, prot: c_int) -> Result<(), StubError> {
     let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) } as usize;
+    if len > page_size.try_into().unwrap() {
+        return Err(StubError::InvalidParameter);
+    }
 
     let ori_ptr = ptr as usize;
 
@@ -21,24 +24,18 @@ unsafe fn _mprotect(ptr: *mut c_void, len: usize, prot: c_int) -> c_int {
 
     let len = ptr_end - ptr_start;
 
-
-    mprotect(ptr_start as *mut c_void, len, prot)
+    unsafe {
+        match mprotect(ptr_start as *mut c_void, len, prot) {
+            0 => Ok(()),
+            ret => Err(StubError::MProtectError(ret))
+        }
+    }
 }
 
 pub fn change_page_rx_mode(origin_func: *mut c_void, inst_len: usize) -> Result<(), StubError> {
-    unsafe {
-        match _mprotect(origin_func, inst_len, MPROTEXT_RX) {
-            0 => Ok(()),
-            ret => Err(StubError::MProtectError(ret))
-        }
-    }
+    _mprotect(origin_func, inst_len, MPROTEXT_RX)
 }
 
 pub fn change_page_rwx_mode(origin_func: *mut c_void, inst_len: usize) -> Result<(), StubError> {
-    unsafe {
-        match _mprotect(origin_func, inst_len, MPROTEXT_RWX) {
-            0 => Ok(()),
-            ret => Err(StubError::MProtectError(ret))
-        }
-    }
+    _mprotect(origin_func, inst_len, MPROTEXT_RWX)
 }
